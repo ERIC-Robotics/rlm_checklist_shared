@@ -25,7 +25,7 @@ export default function LoginClient() {
 
   const next = useMemo(() => {
     const n = searchParams?.get("next");
-    return typeof n === "string" && n.startsWith("/") ? n : "/select";
+    return typeof n === "string" && n.startsWith("/") ? n : "/form";
   }, [searchParams]);
 
   useEffect(() => {
