@@ -474,6 +474,7 @@ export default function ChecklistApp() {
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [trialCreatedAt, setTrialCreatedAt] = useState("");
   const [version, setVersion] = useState("");
+  const [customTrialId, setCustomTrialId] = useState("");
   const [isTrialSwitcherOpen, setIsTrialSwitcherOpen] = useState(false);
   const [isLoginPanelOpen, setIsLoginPanelOpen] = useState(false);
   const [trials, setTrials] = useState([]);
@@ -567,6 +568,7 @@ export default function ChecklistApp() {
         setLastSavedAt(loaded.updatedAt ?? "");
         setTrialCreatedAt(loaded.createdAt ?? meta?.createdAt ?? "");
         setVersion(urlVersion || loaded.version || meta?.version || "");
+        setCustomTrialId(loaded.customTrialId || meta?.customTrialId || "");
         const override = safeShort(loaded.titleOverride);
         setTrialTitleOverride(override);
         setTrialTitle(override || deriveTrialTitle(loaded.answers));
@@ -602,6 +604,7 @@ export default function ChecklistApp() {
         createdAt,
         updatedAt,
         version: safeVersionLabel(version),
+        customTrialId: safeShort(customTrialId),
         titleOverride: safeShort(trialTitleOverride),
       },
       {
@@ -609,12 +612,13 @@ export default function ChecklistApp() {
         createdAt,
         updatedAt,
         version: safeVersionLabel(version),
+        customTrialId: safeShort(customTrialId),
       },
     );
 
     // Keep legacy storage updated for backwards compatibility (single-trial consumers).
     saveChecklist({ answers, updatedAt, trialId });
-  }, [answers, trialId, trialTitleOverride, trialCreatedAt, version]);
+  }, [answers, trialId, trialTitleOverride, trialCreatedAt, version, customTrialId]);
 
   useEffect(() => {
     let raf = 0;
@@ -840,6 +844,7 @@ export default function ChecklistApp() {
       setLastSavedAt(loaded.updatedAt ?? "");
       setTrialCreatedAt(loaded.createdAt ?? meta?.createdAt ?? "");
       setVersion((prev) => loaded.version || meta?.version || prev || "");
+      setCustomTrialId(loaded.customTrialId || meta?.customTrialId || "");
       const override = safeShort(loaded.titleOverride);
       setTrialTitleOverride(override);
       setTrialTitle(override || deriveTrialTitle(loaded.answers));
@@ -903,8 +908,8 @@ export default function ChecklistApp() {
     setLastSavedAt(updatedAt);
     saveTrial(
       trialId,
-      { answers, createdAt, updatedAt, version: safeVersionLabel(version), titleOverride: cleaned },
-      { title: finalTitle, createdAt, updatedAt, version: safeVersionLabel(version) },
+      { answers, createdAt, updatedAt, version: safeVersionLabel(version), customTrialId: safeShort(customTrialId), titleOverride: cleaned },
+      { title: finalTitle, createdAt, updatedAt, version: safeVersionLabel(version), customTrialId: safeShort(customTrialId) },
     );
     setTrials(listTrials());
     window.requestAnimationFrame(() => {
@@ -921,6 +926,7 @@ export default function ChecklistApp() {
     const payload = {
       schemaVersion: 1,
       version: safeVersionLabel(version),
+      customTrialId: safeShort(customTrialId),
       trialId,
       createdAt: trialCreatedAt || null,
       totalQuestions: TOTAL_QUESTIONS,
@@ -937,6 +943,7 @@ export default function ChecklistApp() {
     const payload = {
       schemaVersion: 1,
       version: safeVersionLabel(version),
+      customTrialId: safeShort(customTrialId),
       trialId,
       createdAt: trialCreatedAt || null,
       totalQuestions: TOTAL_QUESTIONS,
@@ -952,7 +959,8 @@ export default function ChecklistApp() {
   function exportExcelCsv() {
     const rows = [["Question No", "Section", "Question", "Answer"]];
     rows.push(["", "", "Version", safeVersionLabel(version)]);
-    rows.push(["", "", "Trial ID", trialId || ""]);
+    rows.push(["", "", "Trial ID", customTrialId || ""]);
+    rows.push(["", "", "System Trial ID", trialId || ""]);
     rows.push(["", "", "Started At", trialCreatedAt ? formatIso(trialCreatedAt) : ""]);
     rows.push(["", "", "Last Saved", lastSavedAt ? formatIso(lastSavedAt) : ""]);
     rows.push(["", "", "", ""]);
@@ -998,8 +1006,39 @@ export default function ChecklistApp() {
   return (
     <div className="app-shell">
       <header className="header">
-        <div className="header-title">
-          Trial Checklist <span className="header-badge">{safeVersionLabel(version)}</span>
+        <div className="header-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          Trial Checklist 
+          <input
+            type="text"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            placeholder="Robot Name / Version"
+            style={{ 
+              marginLeft: '8px',
+              padding: '4px 8px', 
+              borderRadius: '4px', 
+              border: '1px solid var(--border)', 
+              background: 'var(--bg)', 
+              color: 'var(--text)', 
+              fontSize: '14px',
+              width: '180px'
+            }}
+          />
+          <input
+            type="text"
+            value={customTrialId}
+            onChange={(e) => setCustomTrialId(e.target.value)}
+            placeholder="Enter Trial ID"
+            style={{ 
+              padding: '4px 8px', 
+              borderRadius: '4px', 
+              border: '1px solid var(--border)', 
+              background: 'var(--bg)', 
+              color: 'var(--text)', 
+              fontSize: '14px',
+              width: '140px'
+            }}
+          />
         </div>
         <div className="header-right">
           {user ? <span className="header-user">{userLabel(user)}</span> : null}

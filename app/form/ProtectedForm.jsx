@@ -19,16 +19,7 @@ export default function ProtectedForm() {
     router.replace(`/login?next=${encodeURIComponent(next)}`);
   }, [loading, user, router, searchParams]);
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) return;
-    const version = searchParams?.get("version");
-    if (version) return;
 
-    const current = searchParams?.toString();
-    const next = `/form${current ? `?${current}` : ""}`;
-    router.replace(`/select?next=${encodeURIComponent(next)}`);
-  }, [loading, user, router, searchParams]);
 
   if (loading) {
     return (
