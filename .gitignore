@@ -28,6 +28,7 @@ obj/
 *.dll
 *.so
 *.dylib
+.next/
 
 # Python
 __pycache__/

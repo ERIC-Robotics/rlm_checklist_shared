@@ -1,4 +1,6 @@
 {
+  "/api/verify-employee/route": "app/api/verify-employee/route.js",
+  "/form/page": "app/form/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js"
 }
