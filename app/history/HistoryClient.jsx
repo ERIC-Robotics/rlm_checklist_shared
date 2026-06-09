@@ -6,7 +6,7 @@ import { useAuth } from "../components/AuthProvider";
 
 export default function HistoryClient() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { employee, loading } = useAuth();
   const [trials] = useState(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -24,18 +24,18 @@ export default function HistoryClient() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
+    if (!employee) {
       router.replace("/login?next=/history");
       return;
     }
-  }, [loading, user, router]);
+  }, [loading, employee, router]);
 
   const filteredTrials = trials.filter((t) => {
     const q14_type = t.answers?.["14"] || "";
     const q16_date = t.answers?.["16"] || "";
     const q17_loc = t.answers?.["17"] || "";
     const q21_team = t.answers?.["21"] || "";
-    
+
     const searchString = `${t.trialTitle} ${q14_type} ${q16_date} ${q17_loc} ${q21_team}`.toLowerCase();
     return searchString.includes(search.toLowerCase());
   });
@@ -50,12 +50,12 @@ export default function HistoryClient() {
     }
   }
 
-  if (loading || !user) return null;
+  if (loading || !employee) return null;
 
   return (
     <div style={{ padding: "40px", maxWidth: "1200px", margin: "0 auto", fontFamily: "var(--font-ui), sans-serif", minHeight: '100vh' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '40px' }}>
-        <button 
+        <button
           onClick={() => router.push("/form")}
           style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid var(--border)", background: "white", cursor: "pointer", fontWeight: "bold" }}
         >
@@ -65,9 +65,9 @@ export default function HistoryClient() {
       </div>
 
       <div style={{ marginBottom: "24px" }}>
-        <input 
-          type="text" 
-          placeholder="Search by date, trial type, location, or team member name..." 
+        <input
+          type="text"
+          placeholder="Search by date, trial type, location, or team member name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ width: "100%", padding: "14px 20px", borderRadius: "12px", border: "1px solid var(--border)", fontSize: "16px", background: "white", boxShadow: "var(--shadow)" }}
@@ -108,9 +108,9 @@ export default function HistoryClient() {
                     Created: {formatIso(t.createdAt)} &nbsp;|&nbsp; Progress: {t.answeredCount} / {t.totalQuestions} ({t.pct}%)
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button 
+                  <button
                     onClick={() => router.push(`/form?version=${encodeURIComponent(t.version || 'RailwayMitra V2.3')}&trialId=${t.trialId}`)}
                     style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid var(--accent)", background: "var(--accent)", color: "white", fontWeight: "bold", cursor: "pointer" }}
                   >

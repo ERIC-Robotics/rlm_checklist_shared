@@ -2,9 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS, TOTAL_QUESTIONS } from "../../lib/checklistData";
-import { signOut } from "firebase/auth";
-import { auth } from "../../lib/firebaseClient";
-import { clearLoginEvents, clearLoginSessionFlag, listLoginEvents } from "../../lib/loginHistory";
 import { useAuth } from "./AuthProvider";
 import {
   deleteTrial,
@@ -56,27 +53,6 @@ function formatIso(iso) {
 function safeVersionLabel(raw) {
   const v = safeShort(raw);
   return v || "RailwayMitra";
-}
-
-function deriveNameFromEmail(email) {
-  if (typeof email !== "string") return "";
-  const trimmed = email.trim();
-  if (!trimmed) return "";
-  const local = trimmed.split("@")[0] || "";
-  const cleaned = local
-    .replace(/[._-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) return "";
-  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function userLabel(user) {
-  if (!user) return "";
-  const name = typeof user.displayName === "string" ? user.displayName.trim() : "";
-  if (name) return name;
-  const email = typeof user.email === "string" ? user.email.trim() : "";
-  return deriveNameFromEmail(email) || email;
 }
 
 function downloadJson(filename, obj) {
@@ -462,7 +438,7 @@ function Section({ section, answers, setAnswer, flash }) {
 }
 
 export default function ChecklistApp() {
-  const { user } = useAuth();
+  const { employee, logout } = useAuth();
   const [isLoadingUi, setIsLoadingUi] = useState(true);
   const [scrollPct, setScrollPct] = useState(0);
   const [activeSection, setActiveSection] = useState(SECTIONS[0]?.id ?? "sec1");
@@ -476,11 +452,9 @@ export default function ChecklistApp() {
   const [version, setVersion] = useState("");
   const [customTrialId, setCustomTrialId] = useState("");
   const [isTrialSwitcherOpen, setIsTrialSwitcherOpen] = useState(false);
-  const [isLoginPanelOpen, setIsLoginPanelOpen] = useState(false);
   const [trials, setTrials] = useState([]);
   const [isMobileUi, setIsMobileUi] = useState(false);
   const [isActionsCollapsed, setIsActionsCollapsed] = useState(false);
-  const [loginEvents, setLoginEvents] = useState([]);
   const activeSectionRef = useRef(activeSection);
   const suppressAutosaveRef = useRef(false);
 
@@ -503,24 +477,6 @@ export default function ChecklistApp() {
   }, []);
 
   const [answers, setAnswers] = useState(() => makeBaseAnswers());
-
-  useEffect(() => {
-    function refresh() {
-      setLoginEvents(listLoginEvents());
-    }
-    refresh();
-    if (typeof window === "undefined") return undefined;
-    const onCustom = () => refresh();
-    const onStorage = (e) => {
-      if (e?.key && String(e.key).startsWith("rm:loginHistory")) refresh();
-    };
-    window.addEventListener("rm:loginHistoryUpdated", onCustom);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener("rm:loginHistoryUpdated", onCustom);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -933,6 +889,9 @@ export default function ChecklistApp() {
       answeredCount,
       completionPct: pct,
       submittedAt: new Date().toISOString(),
+      submittedBy: employee
+        ? { employeeCode: employee.code, employeeName: employee.name }
+        : null,
       answers,
     };
     downloadJson(`trial-${trialId}-submitted-${utcISODate()}.json`, payload);
@@ -950,6 +909,9 @@ export default function ChecklistApp() {
       answeredCount,
       completionPct: pct,
       exportedAt: new Date().toISOString(),
+      submittedBy: employee
+        ? { employeeCode: employee.code, employeeName: employee.name }
+        : null,
       answers,
     };
     downloadJson(`trial-${trialId}-draft-${utcISODate()}.json`, payload);
@@ -963,6 +925,10 @@ export default function ChecklistApp() {
     rows.push(["", "", "System Trial ID", trialId || ""]);
     rows.push(["", "", "Started At", trialCreatedAt ? formatIso(trialCreatedAt) : ""]);
     rows.push(["", "", "Last Saved", lastSavedAt ? formatIso(lastSavedAt) : ""]);
+    if (employee) {
+      rows.push(["", "", "Employee Code", employee.code]);
+      rows.push(["", "", "Employee Name", employee.name]);
+    }
     rows.push(["", "", "", ""]);
     for (const section of SECTIONS) {
       for (const q of section.questions) {
@@ -1041,7 +1007,7 @@ export default function ChecklistApp() {
           />
         </div>
         <div className="header-right">
-          {user ? <span className="header-user">{userLabel(user)}</span> : null}
+          {employee ? <span className="header-user">{employee.name}</span> : null}
           <span className="header-answered">
             {answeredCount} / {TOTAL_QUESTIONS} answered
           </span>
@@ -1049,27 +1015,16 @@ export default function ChecklistApp() {
           <button className="trial-btn" type="button" onClick={() => setIsTrialSwitcherOpen(true)}>
             Trials
           </button>
-          <button className="trial-btn" type="button" onClick={() => setIsLoginPanelOpen(true)}>
-            Users{loginEvents.length ? ` (${Math.min(99, loginEvents.length)})` : ""}
+          <button
+            className="trial-btn"
+            type="button"
+            onClick={() => {
+              logout();
+              window.location.href = "/login";
+            }}
+          >
+            Logout
           </button>
-          {auth ? (
-            <button
-              className="trial-btn"
-              type="button"
-              onClick={async () => {
-                try {
-                  await signOut(auth);
-                  clearLoginSessionFlag();
-                  window.location.href = "/login";
-                } catch {
-                  clearLoginSessionFlag();
-                  window.location.href = "/login";
-                }
-              }}
-            >
-              Logout
-            </button>
-          ) : null}
         </div>
       </header>
 
@@ -1160,77 +1115,6 @@ export default function ChecklistApp() {
         </div>
       ) : null}
 
-      {isLoginPanelOpen ? (
-        <div
-          className="trial-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Logged in users"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsLoginPanelOpen(false);
-          }}
-        >
-          <div className="trial-panel login-panel">
-            <div className="trial-panel-head">
-              <div className="trial-panel-title">Logged in users (this device)</div>
-              <button className="trial-panel-close" type="button" onClick={() => setIsLoginPanelOpen(false)}>
-                ×
-              </button>
-            </div>
-
-            <div className="login-panel-body">
-              <div className="login-panel-meta">
-                <div className="login-panel-subtitle">
-                  Showing last {Math.min(10, loginEvents.length)} of {loginEvents.length}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => clearLoginEvents()}
-                  className="login-clear"
-                  title="Clear login history on this device"
-                >
-                  Clear history
-                </button>
-              </div>
-
-              <div className="login-list">
-                {loginEvents.length ? (
-                  loginEvents.slice(0, 10).map((e, idx) => {
-                    const initial = (e.name || e.email || "?").trim().slice(0, 1).toUpperCase();
-                    return (
-                      <div
-                        key={`${e.at}-${e.uid}-${idx}`}
-                        className="login-item"
-                      >
-                        <div
-                          aria-hidden="true"
-                          className="login-avatar"
-                        >
-                          {initial || "?"}
-                        </div>
-                        <div className="login-item-main">
-                          <div className="login-item-top">
-                            <div className="login-name">{e.name || "Unknown"}</div>
-                            {e.email ? (
-                              <div className="login-email">{e.email}</div>
-                            ) : null}
-                          </div>
-                          <div className="login-time">{formatIso(e.at)}</div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="login-empty">
-                    No logins recorded on this device yet.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className="global-progress" aria-hidden="true" style={{ "--progress": scrollPct }}>
         <div className="global-progress-track" />
         <div className="global-progress-fill" />
@@ -1258,7 +1142,7 @@ export default function ChecklistApp() {
               </a>
             );
           })}
-          {/* Logout is available in the header; keep only one logout button. */}
+          {/* Logout is in the header. */}
         </nav>
 
         <main className="main">
