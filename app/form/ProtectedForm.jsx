@@ -8,18 +8,16 @@ import { useAuth } from "../components/AuthProvider";
 export default function ProtectedForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading } = useAuth();
+  const { employee, loading } = useAuth();
 
   useEffect(() => {
     if (loading) return;
-    if (user) return;
+    if (employee) return;
 
     const current = searchParams?.toString();
     const next = `/form${current ? `?${current}` : ""}`;
     router.replace(`/login?next=${encodeURIComponent(next)}`);
-  }, [loading, user, router, searchParams]);
-
-
+  }, [loading, employee, router, searchParams]);
 
   if (loading) {
     return (
@@ -36,6 +34,6 @@ export default function ProtectedForm() {
     );
   }
 
-  if (!user) return null;
+  if (!employee) return null;
   return <FormClient />;
 }
