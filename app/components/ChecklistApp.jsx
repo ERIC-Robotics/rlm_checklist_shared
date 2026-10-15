@@ -38,25 +38,26 @@ function agendaQuestionNums(version) {
 // Reads straight from the server so other people's trials are not cached here.
 async function findSubmittedAnswers(version, trials) {
   const candidates = trials
-    .filter((t) => t.version === version)
+    .filter(
+      (t) =>
+        t.version === version && (t.submitted || t.agendaSubmitted),
+    )
     .sort((a, b) => {
-      const bySubmitted = (b.submitted ? 1 : 0) - (a.submitted ? 1 : 0);
-      if (bySubmitted) return bySubmitted;
+      const byAgendaSubmission =
+        Number(Boolean(b.agendaSubmitted)) - Number(Boolean(a.agendaSubmitted));
+      if (byAgendaSubmission) return byAgendaSubmission;
       return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
     })
     .slice(0, 8);
 
   const cachedAnswers = candidates.find(
     (trial) =>
-      (trial.submitted || trial.agendaSubmitted) &&
       trial.agendaAnswers &&
       typeof trial.agendaAnswers === "object",
   )?.agendaAnswers;
   if (cachedAnswers) return cachedAnswers;
 
-  const candidatesNeedingLookup = candidates.filter(
-    (trial) => (trial.submitted || trial.agendaSubmitted) && !trial.agendaAnswers,
-  );
+  const candidatesNeedingLookup = candidates.filter((trial) => !trial.agendaAnswers);
   const responses = await Promise.all(candidatesNeedingLookup.map(async (t) => {
     try {
       const response = await fetch(`/api/trials/${encodeURIComponent(t.trialId)}`);
@@ -1528,6 +1529,78 @@ function EmployeeSearch({ employees, selectedEmployees, disabled, onPick }) {
   );
 }
 
+function PostTrialAgendaSummary({ answer, displayNum, questionText }) {
+  const activities = Array.isArray(answer?.activities) ? answer.activities : [];
+  const deliverables = Array.isArray(answer?.deliverables)
+    ? answer.deliverables
+    : [];
+
+  return (
+    <section
+      className="trial-agenda-tables post-trial-agenda-summary"
+    >
+      <div className="q-label">
+        <span className="q-num">Q{displayNum}</span>
+        <span className="q-text">{questionText}</span>
+      </div>
+
+      <h4 className="trial-agenda-heading">Internal Agenda</h4>
+      <div className="trial-agenda-table-wrap">
+        <table className="trial-agenda-table">
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col">Activity</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activities.length ? (
+              activities.map((item, index) => (
+                <tr key={`post-trial-activity-${index}`}>
+                  <td>{item.category || "—"}</td>
+                  <td>{item.activity || "—"}</td>
+                  <td>{item.details || "—"}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3}>No internal agenda submitted.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <h4 className="trial-agenda-heading">External Agenda</h4>
+      <div className="trial-agenda-table-wrap trial-deliverables-table-wrap">
+        <table className="trial-agenda-table trial-deliverables-table">
+          <thead>
+            <tr>
+              <th scope="col">Sr. No.</th>
+              <th scope="col">Report</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deliverables.length ? (
+              deliverables.map((report, index) => (
+                <tr key={`post-trial-deliverable-${index}`}>
+                  <td>{index + 1}</td>
+                  <td>{report || "—"}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={2}>No external agenda submitted.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function EmployeeRoster({
   answer,
   onChange,
@@ -1951,17 +2024,30 @@ function Section({
           ...q,
           displayNum: questionDisplayNumbers.get(q.num) ?? q.num,
         };
-        const card = (
-          <QuestionCard
-            q={displayQuestion}
-            answer={answers[q.num]}
-            onChange={(next) => setAnswer(q.num, next)}
-            readOnly={section.pmoOnly && !canEditAgenda}
-            onPrintAcknowledgment={onPrintAcknowledgment}
-          />
-        );
+        const isPostTrialAgendaQuestion =
+          section.id.startsWith("sec4") && q.num === 34;
 
-        return <Fragment key={q.num}>{card}</Fragment>;
+        return (
+          <Fragment key={q.num}>
+            {isPostTrialAgendaQuestion ? (
+              <div className="q-card">
+                <PostTrialAgendaSummary
+                  answer={answers[4]}
+                  displayNum={displayQuestion.displayNum}
+                  questionText={displayQuestion.text}
+                />
+              </div>
+            ) : (
+              <QuestionCard
+                q={displayQuestion}
+                answer={answers[q.num]}
+                onChange={(next) => setAnswer(q.num, next)}
+                readOnly={section.pmoOnly && !canEditAgenda}
+                onPrintAcknowledgment={onPrintAcknowledgment}
+              />
+            )}
+          </Fragment>
+        );
       })}
       {section.id === "agenda" && canEditAgenda ? (
         <button
