@@ -1,7 +1,7 @@
 import HistoryClient from "./HistoryClient";
 
 export const metadata = {
-  title: "Trial History | RailwayMitra",
+  title: "Trial List | RailwayMitra",
 };
 
 export default function HistoryPage() {

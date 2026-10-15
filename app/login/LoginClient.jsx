@@ -3,109 +3,67 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { assertFirebaseConfigured, auth, googleProvider } from "../../lib/firebaseClient";
 import { useAuth } from "../components/AuthProvider";
-import { useLocalStorageJson } from "../../lib/useLocalStorageJson";
-import { setKnownUserName } from "../../lib/loginHistory";
-
-const EMPTY_EMAILS = [];
+import { canEditAgenda } from "../../lib/agendaAccess";
 
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { employee, login } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const savedEmailsRaw = useLocalStorageJson("rm:savedEmails", EMPTY_EMAILS);
-  const savedEmails = Array.isArray(savedEmailsRaw) ? savedEmailsRaw : [];
+  const [notice, setNotice] = useState("");
+  const [mode, setMode] = useState("login");
+  const [employeeCode, setEmployeeCode] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
 
-  const next = useMemo(() => {
+  const requestedNext = useMemo(() => {
     const n = searchParams?.get("next");
-    return typeof n === "string" && n.startsWith("/") ? n : "/form";
+    return typeof n === "string" && n.startsWith("/") ? n : "";
   }, [searchParams]);
+  const next = requestedNext || (canEditAgenda(employee?.code) ? "/form?newTrial=1" : "/history");
 
   useEffect(() => {
-    if (user) router.replace(next);
-  }, [user, next, router]);
+    if (employee) router.replace(next);
+  }, [employee, next, router]);
 
-  async function signIn() {
-    setError("");
-    setSubmitting(true);
-    try {
-      assertFirebaseConfigured();
-      const cred = await signInWithPopup(auth, googleProvider);
-      setKnownUserName({
-        uid: cred?.user?.uid || "",
-        email: cred?.user?.email || "",
-        name: (cred?.user?.displayName || "").trim(),
-      });
-      router.replace(next);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Login failed. Please try again.";
-      setError(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function signInManual(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError("Name, email, and password are required.");
+    if (!employeeCode.trim()) {
+      setError("Please enter your employee code.");
       return;
     }
     setError("");
+    setNotice("");
     setSubmitting(true);
     try {
-      assertFirebaseConfigured();
-      let userCred;
-      try {
-        // Attempt to sign in first
-        userCred = await signInWithEmailAndPassword(auth, email.trim(), password.trim());
-      } catch (signInErr) {
-        // If credentials are invalid, they might be a new user (Firebase uses invalid-credential for missing users too)
-        if (signInErr.code === 'auth/invalid-credential') {
-          try {
-            // Attempt to create a new account
-            userCred = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
-          } catch (createErr) {
-            if (createErr.code === 'auth/email-already-in-use') {
-              // If the email exists, then the original invalid-credential was truly a bad password
-              throw new Error("Incorrect password for this email.");
-            }
-            throw createErr;
-          }
-        } else {
-          throw signInErr;
+      if (mode === "register") {
+        const response = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employeeCode: employeeCode.trim(),
+            name: employeeName.trim(),
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "Could not register this employee.");
         }
-      }
-      
-      // Update the user's profile with their name
-      if (userCred.user && name.trim()) {
-        await updateProfile(userCred.user, { displayName: name.trim() });
-      }
-
-      setKnownUserName({
-        uid: userCred?.user?.uid || "",
-        email: userCred?.user?.email || email.trim(),
-        name: name.trim(),
-      });
-      
-      const newEmails = Array.from(new Set([email.trim(), ...savedEmails])).slice(0, 10);
-      window.localStorage.setItem("rm:savedEmails", JSON.stringify(newEmails));
-      
-      router.replace(next);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed. Please try again.";
-      if (err.code === 'auth/weak-password') {
-        setError("Password should be at least 6 characters.");
+        setMode("login");
+        setNotice(result.pendingApproval
+          ? "Registration request sent to the manager. You can sign in after your request is approved."
+          : "Registration request sent. Wait for manager approval before signing in.");
       } else {
-        setError(msg);
+        await login(employeeCode.trim());
       }
+    } catch (err) {
+      const msg = err instanceof Error
+        ? err.message
+        : mode === "register"
+          ? "Registration check failed. Please try again."
+          : "Login failed. Please try again.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -116,71 +74,80 @@ export default function LoginClient() {
       <div className="landing-bg" aria-hidden="true" />
       <div className="landing-grid">
         <section className="landing-card">
-          <div className="landing-badge">Required</div>
+          <div className="landing-badge">{mode === "register" ? "Employee registration" : "Required"}</div>
           <h1 className="landing-title">Trial SOP Checklist</h1>
           <p className="landing-subtitle">RailwayMitra - POC2</p>
           <p className="landing-desc">
-            Sign in to continue. Your trial data remains stored locally on this device.
+            {mode === "register"
+              ? "Verify your company-issued employee code before signing in."
+              : "Enter your employee code to continue. Trials and history are shared with your team."}
           </p>
 
-            <div className="landing-authbox" role="region" aria-label="Login">
-              <button className="auth-btn auth-btn-google" type="button" onClick={signIn} disabled={submitting}>
-                <span className="auth-btn-icon" aria-hidden="true">
-                  <GoogleG />
-                </span>
-                <span className="auth-btn-text">{submitting ? "Signing in…" : "Continue with Google"}</span>
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#6b7280', fontSize: '14px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }}></div>
-                <div style={{ padding: '0 10px' }}>OR</div>
-                <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }}></div>
-              </div>
-
-              <form onSubmit={signInManual} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="landing-authbox" role="region" aria-label={mode === "register" ? "Employee registration" : "Login"}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {mode === "register" ? (
                 <input
                   type="text"
-                  placeholder="Your Name"
+                  placeholder="Full Name"
                   className="q-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
                   disabled={submitting}
+                  autoFocus
+                  maxLength={120}
+                  autoComplete="name"
                   style={{ width: '100%', boxSizing: 'border-box' }}
                 />
-                <datalist id="saved-emails">
-                  {savedEmails.map((e) => <option key={e} value={e} />)}
-                </datalist>
-                <input
-                  type="email"
-                  placeholder="Email ID"
-                  className="q-input"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  list="saved-emails"
-                  disabled={submitting}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  className="q-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={submitting}
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                />
-                <button 
-                  className="auth-btn" 
-                  type="submit" 
-                  disabled={submitting}
-                  style={{ backgroundColor: '#f4c430', color: '#2a2002', border: 'none', justifyContent: 'center' }}
-                >
-                  <span className="auth-btn-text">{submitting ? "Signing in…" : "Sign In"}</span>
-                </button>
-              </form>
+              ) : null}
+              <input
+                type="text"
+                placeholder="Employee Code"
+                className="q-input"
+                value={employeeCode}
+                onChange={(e) => setEmployeeCode(e.target.value)}
+                disabled={submitting}
+                autoFocus={mode === "login"}
+                maxLength={32}
+                style={{ width: '100%', boxSizing: 'border-box', textTransform: 'uppercase' }}
+              />
+              <button
+                className="auth-btn"
+                type="submit"
+                disabled={submitting}
+                style={{ backgroundColor: '#f4c430', color: '#2a2002', border: 'none', justifyContent: 'center' }}
+              >
+                <span className="auth-btn-text">
+                  {submitting
+                    ? "Verifying…"
+                    : mode === "register"
+                      ? "Verify Employee Code"
+                      : "Sign In"}
+                </span>
+              </button>
+            </form>
 
-              {error ? <p className="auth-error" style={{ marginTop: '16px' }}>{error}</p> : null}
-            </div>
+            {error ? <p className="auth-error" style={{ marginTop: '16px' }}>{error}</p> : null}
+            {notice ? <p role="status" style={{ marginTop: "16px", color: "#166534" }}>{notice}</p> : null}
+            <button
+              type="button"
+              onClick={() => {
+                setMode((current) => current === "login" ? "register" : "login");
+                setError("");
+                setNotice("");
+              }}
+              style={{
+                marginTop: "16px",
+                border: 0,
+                padding: 0,
+                background: "transparent",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              {mode === "login" ? "New employee? Register" : "Already registered? Sign in"}
+            </button>
+          </div>
         </section>
 
         <section className="landing-collage" aria-label="Checklist preview collage">
@@ -199,30 +166,6 @@ export default function LoginClient() {
         </section>
       </div>
     </main>
-  );
-}
-
-function GoogleG() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 48 48">
-      <path
-        fill="#EA4335"
-        d="M24 9.5c3.54 0 6.72 1.22 9.23 3.6l6.9-6.9C35.8 2.42 30.3 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.02 6.23C12.46 13.01 17.77 9.5 24 9.5z"
-      />
-      <path
-        fill="#4285F4"
-        d="M46.98 24.55c0-1.64-.15-3.22-.43-4.75H24v9.01h12.94c-.56 2.98-2.24 5.5-4.77 7.2l7.73 5.98c4.52-4.18 7.08-10.34 7.08-17.44z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M10.58 28.45c-.48-1.43-.76-2.96-.76-4.45s.27-3.02.76-4.45l-8.02-6.23C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.68l8.02-6.23z"
-      />
-      <path
-        fill="#34A853"
-        d="M24 48c6.3 0 11.6-2.08 15.47-5.67l-7.73-5.98c-2.15 1.45-4.9 2.3-7.74 2.3-6.23 0-11.54-3.51-13.42-8.45l-8.02 6.23C6.51 42.62 14.62 48 24 48z"
-      />
-      <path fill="none" d="M0 0h48v48H0z" />
-    </svg>
   );
 }
 

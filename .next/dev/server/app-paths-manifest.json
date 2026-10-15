@@ -1,4 +1,11 @@
 {
+  "/api/agenda-employees/route": "app/api/agenda-employees/route.js",
+  "/api/session/route": "app/api/session/route.js",
+  "/api/submit-trial/route": "app/api/submit-trial/route.js",
+  "/api/trials/[trialId]/route": "app/api/trials/[trialId]/route.js",
+  "/api/trials/route": "app/api/trials/route.js",
+  "/form/page": "app/form/page.js",
+  "/history/page": "app/history/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js"
 }

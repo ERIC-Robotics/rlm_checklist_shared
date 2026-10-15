@@ -1,35 +1,89 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../../lib/firebaseClient";
-import { recordLoginEvent } from "../../lib/loginHistory";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-const AuthContext = createContext({ user: null, loading: true });
+const STORAGE_KEY = "rm:employee:v1";
+
+const AuthContext = createContext({ employee: null, loading: true });
+
+function writeEmployee(employee) {
+  if (typeof window === "undefined") return;
+  if (employee) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(employee));
+  } else {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+}
 
 export default function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(Boolean(auth));
+  const [employee, setEmployee] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth) return undefined;
-
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (u) => {
-        setUser(u ?? null);
-        if (u) recordLoginEvent(u);
+    let active = true;
+    fetch("/api/session")
+      .then(async (response) => {
+        if (response.status === 401) return null;
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not restore your session.");
+        return data.employee || null;
+      })
+      .then((currentEmployee) => {
+        if (!active) return;
+        writeEmployee(currentEmployee);
+        setEmployee(currentEmployee);
         setLoading(false);
-      },
-      () => {
-        setUser(null);
+      })
+      .catch(() => {
+        if (!active) return;
+        writeEmployee(null);
+        setEmployee(null);
         setLoading(false);
-      },
-    );
-    return () => unsubscribe();
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const value = useMemo(() => ({ user, loading }), [user, loading]);
+  const login = useCallback(async (employeeCode) => {
+    const res = await fetch("/api/verify-employee", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employeeCode }),
+    });
+    const data = await res.json();
+    if (!data.valid) {
+      throw new Error(data.error || "Invalid employee code");
+    }
+    const emp = {
+      code: data.employee.code,
+      name: data.employee.name,
+      designation: data.employee.designation || "",
+    };
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(`rm:trial-version:v1:${emp.code}`);
+      } catch {}
+    }
+    writeEmployee(emp);
+    setEmployee(emp);
+  }, []);
+
+  const logout = useCallback(() => {
+    if (employee?.code && typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(`rm:trial-version:v1:${employee.code}`);
+      } catch {}
+    }
+    fetch("/api/session", { method: "DELETE" })
+      .catch((error) => console.error("Logout request failed:", error))
+      .finally(() => {
+        writeEmployee(null);
+        setEmployee(null);
+      });
+  }, [employee]);
+
+  const value = useMemo(() => ({ employee, loading, login, logout }), [employee, loading, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
