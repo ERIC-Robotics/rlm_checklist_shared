@@ -2820,3 +2820,278 @@ button {
     padding: 24px 16px;
   }
 }
+
+/* Shared responsive refinements for checklist, dashboard, and support screens. */
+html,
+body {
+  min-width: 320px;
+  overflow-x: clip;
+}
+
+.layout,
+.trial-list-layout,
+.tickets-shell,
+.main,
+.trial-list-main {
+  min-width: 0;
+}
+
+.history-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.trial-list-sidebar {
+  flex-shrink: 0;
+}
+
+.trial-list-main > * {
+  min-width: 0;
+}
+
+.header-title > img {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+@media (min-width: 901px) {
+  .main {
+    max-width: min(1120px, calc(100vw - 308px));
+    padding-right: clamp(28px, 4vw, 64px);
+    padding-left: clamp(28px, 4vw, 64px);
+  }
+
+  .history-shell,
+  .trial-list-main,
+  .tickets-shell {
+    padding-right: clamp(24px, 4vw, 56px);
+    padding-left: clamp(24px, 4vw, 56px);
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    min-height: 0;
+    height: auto;
+    padding: 8px 14px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-title {
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+    flex-wrap: nowrap !important;
+    font-size: 15px;
+  }
+
+  .header-title > img {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  .header-title > span {
+    white-space: nowrap;
+  }
+
+  .compact-control-group {
+    min-width: 0;
+    gap: 5px;
+    flex-wrap: nowrap;
+  }
+
+  .compact-control {
+    min-height: 30px;
+    font-size: 11px;
+  }
+
+  .compact-control-select {
+    max-width: 86px;
+    padding-right: 20px;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 7px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 1px 1px 4px;
+    scrollbar-width: thin;
+  }
+
+  .header-user {
+    max-width: 125px;
+  }
+
+  .header-answered {
+    font-size: 11px;
+  }
+
+  .header-right button {
+    flex: 0 0 auto;
+  }
+
+  .global-progress {
+    top: 104px;
+  }
+
+  .main {
+    padding: 20px 16px 160px;
+  }
+
+  .section-block {
+    margin-bottom: 32px;
+  }
+
+  .form-submit-row {
+    justify-content: stretch;
+  }
+
+  .form-submit-row .form-print-button,
+  .form-submit-row .form-submit-button {
+    min-width: 0;
+  }
+
+  .trial-list-sidebar {
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .trial-list-brand {
+    flex: 1 0 100%;
+    margin: 0 0 2px;
+    font-size: 17px;
+  }
+
+  .trial-list-nav-item,
+  .trial-list-logout {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 42px;
+    padding: 9px 10px;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .trial-list-main {
+    padding: 20px 14px;
+  }
+
+  .ticket-panel {
+    width: 100%;
+    max-width: 620px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .header-title {
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .compact-control-group {
+    gap: 4px;
+  }
+
+  .compact-control-button {
+    max-width: 82px;
+    overflow: hidden;
+    padding: 5px 6px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .compact-control-input {
+    padding: 5px 6px;
+  }
+
+  .header-user {
+    max-width: 100px;
+  }
+
+  .raise-ticket-btn,
+  .trial-btn {
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+
+  .main {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .q-card {
+    padding: 14px 13px;
+    border-radius: 12px;
+  }
+
+  .location-pair-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trial-list-sidebar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trial-list-brand {
+    grid-column: 1 / -1;
+  }
+
+  .trial-list-nav-item,
+  .trial-list-logout {
+    min-width: 0;
+  }
+
+  .trial-list-main {
+    padding: 18px 12px;
+  }
+
+  .ticket-panel-head,
+  .ticket-form {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .ticket-question,
+  .ticket-input,
+  .ticket-select,
+  .ticket-textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 360px) {
+  .header-title > img {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .header-title {
+    font-size: 12px;
+  }
+
+  .compact-control-button {
+    max-width: 66px;
+  }
+
+  .compact-control-select {
+    max-width: 70px;
+  }
+
+  .trial-list-nav-item,
+  .trial-list-logout {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 11px;
+  }
+}

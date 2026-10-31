@@ -2049,18 +2049,18 @@ function Section({
           </Fragment>
         );
       })}
-      {section.id === "agenda" && canEditAgenda ? (
+      {section.id === "agenda" ? (
         <button
-          className="agenda-submit-button"
+          className={`agenda-submit-button${!canEditAgenda ? " agenda-submit-readonly" : ""}`}
           type="button"
-          onClick={onSubmitAgenda}
-          disabled={agendaSubmitting || agendaSubmitted}
+          onClick={canEditAgenda ? onSubmitAgenda : undefined}
+          disabled={agendaSubmitting || agendaSubmitted || !canEditAgenda}
         >
           {agendaSubmitting
             ? "Submitting…"
             : agendaSubmitted
               ? "Agenda Submitted"
-              : "Submit Agenda to Trial List"}
+              : "Submit Agenda "}
         </button>
       ) : null}
       {section.id.startsWith("sec3") ? (
@@ -3487,6 +3487,7 @@ export default function ChecklistApp() {
     setTrials(listTrials());
     setLastSavedAt(submittedAt);
 
+    // Save to server
     try {
       const response = await fetch(`/api/trials/${encodeURIComponent(trialId)}`, {
         method: "PUT",
@@ -3497,47 +3498,45 @@ export default function ChecklistApp() {
       if (!response.ok) {
         throw new Error(result.error || "Could not submit the trial.");
       }
-
-      try {
-        const emailResponse = await fetch("/api/submit-trial", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            trialId,
-            answers,
-            customTrialId: safeShort(customTrialId),
-            version: safeVersionLabel(version),
-            submittedAt,
-            submittedBy: {
-              employeeName: employee?.name,
-              employeeCode: employee?.code,
-            },
-            answeredCount,
-            totalQuestions: TOTAL_QUESTIONS,
-            completionPct: pct,
-          }),
-        });
-        const emailResult = await emailResponse.json().catch(() => ({}));
-        if (!emailResponse.ok || !emailResult.ok) {
-          throw new Error(emailResult.error || "Could not send the trial report.");
-        }
-      } catch (emailError) {
-        console.error("Post-trial report email failed:", emailError);
-        window.alert(
-          `The trial was submitted, but its report could not be emailed: ${emailError instanceof Error ? emailError.message : "Please check the email service and try again."}`,
-        );
-      }
-
-      setToast("Post-trial details submitted and added to Trial History.");
-      router.push("/history");
     } catch (error) {
-      console.error("Post-trial submission failed:", error);
-      setToast(
-        `Trial saved on this device, but shared submission failed: ${error instanceof Error ? error.message : "Please try again."}`,
-      );
-    } finally {
+      console.error("Post-trial save failed:", error);
+      setToast(`Trial saved locally, but shared submission failed: ${error instanceof Error ? error.message : "Please try again."}`);
       setTrialSubmitting(false);
+      return;
     }
+
+    // Send email summary
+    try {
+      const emailResponse = await fetch("/api/submit-trial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trialId,
+          answers,
+          customTrialId: safeShort(customTrialId),
+          version: safeVersionLabel(version),
+          submittedAt,
+          submittedBy: {
+            employeeName: employee?.name,
+            employeeCode: employee?.code,
+          },
+          answeredCount,
+          totalQuestions: TOTAL_QUESTIONS,
+          completionPct: pct,
+        }),
+      });
+      const emailResult = await emailResponse.json().catch(() => ({}));
+      if (!emailResponse.ok || !emailResult.ok) {
+        throw new Error(emailResult.error || "Could not send the trial report email.");
+      }
+      setToast("Post-trial submitted. Trial summary emailed successfully.");
+    } catch (emailError) {
+      console.error("Post-trial email failed:", emailError);
+      setToast(`Trial submitted, but email failed: ${emailError instanceof Error ? emailError.message : "Check email config."}`);
+    }
+
+    setTrialSubmitting(false);
+    router.push("/history");
   }
 
   useEffect(() => {

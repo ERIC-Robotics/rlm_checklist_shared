@@ -162,6 +162,11 @@ export async function POST(request) {
     const attachments = transactionResults.slice(1).map((result) => result[0]);
     ticket.attachments = attachments;
     const mailResult = await sendTicketEmail({ ticket });
+    if (mailResult.ok) {
+      console.log("Ticket email sent via", mailResult.provider, "to:", mailResult.to);
+    } else {
+      console.error("Ticket email failed:", mailResult.error);
+    }
 
     return NextResponse.json({
       ok: true,
