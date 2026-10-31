@@ -151,36 +151,31 @@ Blocking issues are shown in a toast; submission is prevented until resolved.
 Click **Submit Post-Trial** to save the trial and send the full trial summary
 and PDF report to the address(es) configured in `SOFTWARE_LEAD_EMAIL`.
 Support-ticket email routing is unchanged.
+The Post-Trial Checklist also shows the trial's PMO-submitted Internal and
+External Agenda immediately above **Trial objective achieved**.
 
 Setup:
 
 1. Copy `.env.example` to `.env.local`.
-2. On Cloudflare Workers, the app uses Cloudflare Email Service automatically
-   when the `EMAIL` binding is enabled. A Cloudflare account/domain admin must
+2. On Cloudflare Workers, the app uses Cloudflare Email Service through the
+   `EMAIL` binding in `wrangler.jsonc`. A Cloudflare account/domain admin must
    enable Email Sending and onboard the company sender domain once in Cloudflare;
    use a sender address on that domain (the default is
-   `reports@ericrobotics.com`). This needs no Microsoft/Azure IDs or SMTP
-   password. Locally, or on hosts without that binding, configure another
-   provider as below.
-3. For Microsoft 365, configure `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`,
-   `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_FROM_EMAIL`, and the email recipient
-   variables. Register an application in Microsoft Entra, grant Microsoft
-   Graph **Application** permission `Mail.Send`, and have an administrator
-   grant consent. The sender mailbox must be allowed by that app permission.
-   For other SMTP providers, configure `SMTP_HOST`, `SMTP_PORT`,
-   `SMTP_USER`, `SMTP_PASS`, and `MAIL_FROM` instead.
-4. Set `SOFTWARE_LEAD_EMAIL` to the recipient(s) for trial report emails. Trial
+   `reports@ericrobotics.com`). If Cloudflare Email rejects a send, the app
+   falls back to SMTP using `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+   `SMTP_USER`, and `SMTP_PASS`.
+3. Set `MAIL_FROM` to the authorized sender address. Set `SOFTWARE_LEAD_EMAIL`
+   to the recipient(s) for trial report emails. Trial
    reports use this setting; support-ticket routing remains unchanged.
-5. Restart the dev/production server so the new environment variables are picked up.
+4. Configure `MAIL_TO`, `TEAM_LEAD_EMAILS`, `HARDWARE_LEAD_EMAIL`, and
+   `SOFTWARE_LEAD_EMAIL` as needed for message recipients.
 
-If email isn't configured (or the SMTP server rejects the send), the app
-does **not** lose the submission: it shows the exact reason in the toast
-(e.g. "Email is not configured on the server…", "Email login was
-rejected…") and automatically downloads the generated PDF locally so it
-can be sent manually.
+If both Cloudflare Email and SMTP reject a send, the app does **not** lose the
+submission: it reports the send error and automatically downloads the generated
+PDF locally so it can be sent manually.
 
 Relevant files: `lib/generateTrialPdf.js` (PDF layout), `lib/mailer.js`
-(Graph OAuth and SMTP delivery), `app/api/submit-trial/route.js` (API
+(Cloudflare Email delivery), `app/api/submit-trial/route.js` (API
 route wiring the two together).
 
 ## Data Persistence Model
@@ -214,17 +209,13 @@ its login, database, and submission routes.
      `wrangler.jsonc`; have a Cloudflare account/domain admin enable Email
      Sending and onboard `ericrobotics.com` once. Set `MAIL_FROM` to an
      onboarded sender address if it differs from `reports@ericrobotics.com`.
-     No mail provider IDs or SMTP password are needed for this option.
-   - For Microsoft 365 email, set `MS_GRAPH_TENANT_ID`, `MS_GRAPH_CLIENT_ID`,
-     `MS_GRAPH_CLIENT_SECRET`, and `MS_GRAPH_FROM_EMAIL`. The Entra app needs
-     Microsoft Graph **Application** permission `Mail.Send` with admin consent.
-     For SMTP providers, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
-     `SMTP_USER`, `SMTP_PASS`, and `MAIL_FROM`. Set `MAIL_TO` for trial PDF
-     email. Support-ticket routing can also
-     use `TEAM_LEAD_EMAILS`, `HARDWARE_LEAD_EMAIL`, and `SOFTWARE_LEAD_EMAIL`.
-     Employee-registration notices go to `reports@ericrobotics.com`. Set
-     `APP_BASE_URL` to the deployed HTTPS origin so manager approval links point
-     to the live Worker.
+     SMTP fallback uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+     and `SMTP_PASS` secrets. Set `MAIL_FROM` to the sender allowed by that
+     SMTP account. Set `MAIL_TO` for trial PDF email and use
+     `TEAM_LEAD_EMAILS`, `HARDWARE_LEAD_EMAIL`, and `SOFTWARE_LEAD_EMAIL` for
+     ticket routing. Employee-registration notices go to
+     `reports@ericrobotics.com`. Set `APP_BASE_URL` to the deployed HTTPS origin
+     so manager approval links point to the live Worker.
      Keep these private; do not commit them to source control.
 4. Add active employees to the same Neon database (the SQL example above
    applies). If using `npm run seed:employees`, review the employee list first.
@@ -246,7 +237,7 @@ automatic Git deployment).
 
 ## Deploying to GitHub and Vercel
 
-1. Push this app directory (the folder containing `package.json`) to a private company GitHub repository. Do not commit `.env.local`, database URLs, SMTP passwords, or other secrets.
+1. Push this app directory (the folder containing `package.json`) to a private company GitHub repository. Do not commit `.env.local`, database URLs, or other secrets.
 2. In Vercel, import the repository. If the repository contains the parent folder too, set **Root Directory** to `rlm_checklist_shared-feat-simple_login`; otherwise use the repository root.
 3. Create or select a Neon PostgreSQL database. Add the following Vercel Environment Variables for Production (and Preview if needed):
    - `DATABASE_URL`: the Neon pooled connection string.
@@ -261,7 +252,7 @@ automatic Git deployment).
    ```
 
    Only active employee codes in this database can sign in. Do not seed the sample codes in production.
-5. For Microsoft 365 email, configure the Graph OAuth variables listed above and the recipient variables. For another SMTP provider, set its SMTP variables. Leave mail variables out to disable email; submissions still download a PDF if sending is unavailable.
+5. Email delivery tries the Cloudflare Email binding first, then configured SMTP if Cloudflare rejects it. Other hosting providers can use SMTP directly.
 6. Deploy. After deployment, share `https://YOUR-VERCEL-DOMAIN/form` with the team. Employees sign in with the active codes added above. Their trials and Trial History are stored in the shared database.
 
 After changing environment variables, redeploy the Vercel project so the deployment picks them up.

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RailwayMitra – Developer Architecture</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f4f6fb; color: #1a1a2e; }
+  .cover { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%); color: #fff; padding: 60px 40px; text-align: center; }
+  .cover h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: 1px; }
+  .cover p { margin-top: 12px; font-size: 1rem; opacity: 0.75; }
+  .cover .badges { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 4px 14px; font-size: 0.8rem; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+  h2 { font-size: 1.5rem; font-weight: 700; color: #0f3460; margin: 40px 0 16px; border-left: 4px solid #e94560; padding-left: 12px; }
+  h3 { font-size: 1.1rem; font-weight: 700; color: #16213e; margin: 28px 0 12px; }
+  p { line-height: 1.7; color: #444; margin-bottom: 12px; }
+
+  /* FLOWCHART */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 24px 0; }
+  .flow-row { display: flex; align-items: center; gap: 0; }
+  .box { background: #fff; border: 2px solid #0f3460; border-radius: 10px; padding: 10px 22px; font-size: 0.88rem; font-weight: 600; color: #0f3460; text-align: center; min-width: 180px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .box.green { border-color: #22c55e; color: #166534; background: #f0fdf4; }
+  .box.red { border-color: #ef4444; color: #991b1b; background: #fef2f2; }
+  .box.yellow { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+  .box.blue { border-color: #3b82f6; color: #1e40af; background: #eff6ff; }
+  .box.purple { border-color: #8b5cf6; color: #5b21b6; background: #f5f3ff; }
+  .box.gray { border-color: #6b7280; color: #374151; background: #f9fafb; }
+  .box.orange { border-color: #f97316; color: #9a3412; background: #fff7ed; }
+  .diamond { background: #fff; border: 2px solid #e94560; border-radius: 4px; padding: 10px 18px; font-size: 0.85rem; font-weight: 700; color: #e94560; text-align: center; transform: rotate(0deg); min-width: 200px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); height: 80px; display: flex; align-items: center; justify-content: center; }
+  .arrow-down { width: 2px; height: 32px; background: #0f3460; margin: 0 auto; position: relative; }
+  .arrow-down::after { content: ''; position: absolute; bottom: -6px; left: -5px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #0f3460; }
+  .arrow-right { width: 40px; height: 2px; background: #0f3460; position: relative; }
+  .arrow-right::after { content: ''; position: absolute; right: -6px; top: -5px; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 8px solid #0f3460; }
+  .arrow-label { font-size: 0.75rem; color: #6b7280; margin: 0 6px; font-style: italic; }
+  .fork { display: flex; gap: 40px; align-items: flex-start; margin: 8px 0; }
+  .fork-branch { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .fork-label { font-size: 0.75rem; font-weight: 700; color: #e94560; margin-bottom: 6px; }
+
+  /* SYSTEM DIAGRAM */
+  .system-diagram { display: flex; flex-direction: column; gap: 4px; margin: 24px 0; }
+  .layer { border-radius: 12px; padding: 18px 24px; }
+  .layer-browser { background: #eff6ff; border: 2px solid #3b82f6; }
+  .layer-server { background: #f0fdf4; border: 2px solid #22c55e; }
+  .layer-data { background: #fdf4ff; border: 2px solid #a855f7; }
+  .layer-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
+  .layer-items { display: flex; gap: 12px; flex-wrap: wrap; }
+  .layer-item { background: #fff; border-radius: 8px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); }
+  .layer-arrow { text-align: center; font-size: 1.4rem; color: #6b7280; line-height: 1; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; }
+  th { background: #0f3460; color: #fff; padding: 10px 14px; text-align: left; }
+  td { padding: 9px 14px; border-bottom: 1px solid #e5e7eb; }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; }
+  .tag-green { background: #dcfce7; color: #166534; }
+  .tag-red { background: #fee2e2; color: #991b1b; }
+  .tag-blue { background: #dbeafe; color: #1e40af; }
+  .tag-yellow { background: #fef9c3; color: #854d0e; }
+
+  /* DB SCHEMA */
+  .schema { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+  .table-box { background: #fff; border: 2px solid #0f3460; border-radius: 10px; min-width: 220px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .table-box-header { background: #0f3460; color: #fff; padding: 8px 14px; font-weight: 700; font-size: 0.9rem; }
+  .table-box-row { padding: 6px 14px; font-size: 0.82rem; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; gap: 10px; }
+  .table-box-row:last-child { border-bottom: none; }
+  .col-type { color: #6b7280; font-size: 0.78rem; }
+  .col-pk { color: #e94560; font-weight: 700; font-size: 0.75rem; }
+  .col-fk { color: #f59e0b; font-weight: 700; font-size: 0.75rem; }
+
+  /* FOLDER */
+  .folder { background: #1a1a2e; color: #a5f3fc; border-radius: 10px; padding: 20px 24px; font-family: monospace; font-size: 0.85rem; line-height: 1.8; overflow-x: auto; }
+  .folder .dir { color: #fbbf24; }
+  .folder .file { color: #a5f3fc; }
+  .folder .comment { color: #6b7280; }
+
+  /* EMAIL FLOW */
+  .email-flow { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+  .email-card { background: #fff; border-radius: 12px; padding: 18px; border: 2px solid #e5e7eb; flex: 1; min-width: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .email-card h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; color: #0f3460; }
+  .email-card .recipient { background: #f0fdf4; border: 1px solid #22c55e; border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; margin: 4px 0; color: #166534; }
+
+  .section-card { background: #fff; border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+  .role-box { display: flex; gap: 20px; flex-wrap: wrap; margin: 16px 0; }
+  .role-card { flex: 1; min-width: 220px; border-radius: 10px; padding: 18px; }
+  .role-card.regular { background: #eff6ff; border: 2px solid #3b82f6; }
+  .role-card.pmo { background: #fdf4ff; border: 2px solid #a855f7; }
+  .role-card h4 { font-weight: 700; margin-bottom: 10px; }
+  .role-card ul { padding-left: 18px; font-size: 0.88rem; line-height: 2; }
+
+  footer { text-align: center; padding: 30px; color: #9ca3af; font-size: 0.82rem; border-top: 1px solid #e5e7eb; margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>🚂 RailwayMitra — Developer Architecture</h1>
+  <p>ERIC Robotics · Trial Checklist Platform · Technical Reference Document</p>
+  <div class="badges">
+    <span class="badge">Next.js 16</span>
+    <span class="badge">React 19</span>
+    <span class="badge">Neon PostgreSQL</span>
+    <span class="badge">Cloudflare Workers</span>
+    <span class="badge">Cloudflare Email</span>
+    <span class="badge">Version 1.0</span>
+  </div>
+</div>
+
+<div class="container">
+
+<h2>1. System Overview</h2>
+<p>RailwayMitra is a field trial management platform for ERIC Robotics. Field engineers fill trial checklists, PMO manages agendas, and leads receive automated email summaries on submission.</p>
+<div class="system-diagram">
+  <div class="layer layer-browser">
+    <div class="layer-title" style="color:#1e40af">Browser (Client)</div>
+    <div class="layer-items">
+      <div class="layer-item">Login</div>
+      <div class="layer-item">Select Version</div>
+      <div class="layer-item">Fill Checklist</div>
+      <div class="layer-item">Submit Trial</div>
+      <div class="layer-item">Trial History</div>
+      <div class="layer-item">Raise Ticket</div>
+    </div>
+  </div>
+  <div class="layer-arrow">&#8595; fetch / REST API &#8595;</div>
+  <div class="layer layer-server">
+    <div class="layer-title" style="color:#166534">Next.js App (Cloudflare Worker)</div>
+    <div class="layer-items">
+      <div class="layer-item">App Router</div>
+      <div class="layer-item">API Routes</div>
+      <div class="layer-item">Session Middleware</div>
+      <div class="layer-item">Email Service</div>
+    </div>
+  </div>
+  <div class="layer-arrow">&#8595; queries / sends &#8595;</div>
+  <div class="layer layer-data">
+    <div class="layer-title" style="color:#7e22ce">Data Layer</div>
+    <div class="layer-items">
+      <div class="layer-item">Neon PostgreSQL</div>
+      <div class="layer-item">localStorage (cache)</div>
+      <div class="layer-item">Cloudflare Email</div>
+    </div>
+  </div>
+</div>
+
+<h2>2. Authentication Flow</h2>
+<div class="flow">
+  <div class="box blue">User visits /form</div>
+  <div class="arrow-down"></div>
+  <div class="box yellow">AuthProvider checks localStorage</div>
+  <div class="arrow-down"></div>
+  <div style="display:flex;gap:60px;align-items:flex-start;">
+    <div class="flow">
+      <div class="box-label" style="font-size:0.75rem;color:#22c55e;font-weight:700;margin-bottom:6px;">Found &amp; valid</div>
+      <div class="box green">Show Checklist</div>
+    </div>
+    <div class="flow">
+      <div class="box-label" style="font-size:0.75rem;color:#ef4444;font-weight:700;margin-bottom:6px;">Not found</div>
+      <div class="box red">Redirect /login</div>
+      <div class="arrow-down"></div>
+      <div class="box blue">Enter Employee Code</div>
+      <div class="arrow-down"></div>
+      <div class="box">POST /api/verify-employee</div>
+      <div class="arrow-down"></div>
+      <div style="display:flex;gap:40px;align-items:flex-start;">
+        <div class="flow">
+          <div style="font-size:0.75rem;color:#22c55e;font-weight:700;margin-bottom:6px;">Valid + Active</div>
+          <div class="box green">Set session cookie</div>
+          <div class="arrow-down"></div>
+          <div class="box green">Redirect /select</div>
+        </div>
+        <div class="flow">
+          <div style="font-size:0.75rem;color:#ef4444;font-weight:700;margin-bottom:6px;">Invalid</div>
+          <div class="box red">Show Error</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>3. Trial Submission Flow</h2>
+<div class="flow">
+  <div class="box blue">User fills checklist (Sections 1 to 4)</div>
+  <div class="arrow-down"></div>
+  <div class="box yellow">Auto-save on every answer change</div>
+  <div class="arrow-down"></div>
+  <div class="box">saveTrial() &#8594; localStorage + queueRemoteTrialSave()</div>
+  <div class="arrow-down"></div>
+  <div class="box gray">PUT /api/trials/:trialId (debounced 500ms)</div>
+  <div class="arrow-down"></div>
+  <div class="box blue">Click "Submit Post-Trial"</div>
+  <div class="arrow-down"></div>
+  <div class="box">submitPostTrial() in ChecklistApp.jsx</div>
+  <div class="arrow-down"></div>
+  <div class="box yellow">1. saveTrial() locally (submitted: true)</div>
+  <div class="arrow-down"></div>
+  <div class="box yellow">2. PUT /api/trials/:trialId &#8594; mark submitted in DB</div>
+  <div class="arrow-down"></div>
+  <div style="display:flex;gap:40px;align-items:flex-start;">
+    <div class="flow">
+      <div style="font-size:0.75rem;color:#ef4444;font-weight:700;margin-bottom:6px;">Fail</div>
+      <div class="box red">Show toast, STOP</div>
+    </div>
+    <div class="flow">
+      <div style="font-size:0.75rem;color:#22c55e;font-weight:700;margin-bottom:6px;">Success</div>
+      <div class="box yellow">3. POST /api/submit-trial</div>
+      <div class="arrow-down"></div>
+      <div class="box">getSessionEmployee() verify cookie</div>
+      <div class="arrow-down"></div>
+      <div class="box">formatTrialSummary() build email</div>
+      <div class="arrow-down"></div>
+      <div class="box green">sendTrialPdfEmail() &#8594; TRIAL_REPORT_EMAIL</div>
+      <div class="arrow-down"></div>
+      <div class="box green">4. router.push("/history")</div>
+    </div>
+  </div>
+</div>
+
+<h2>4. Email Routing Flow</h2>
+<div class="email-flow">
+  <div class="email-card">
+    <h4>Trial Submission</h4>
+    <p style="font-size:0.82rem;color:#6b7280;margin-bottom:8px;">Triggered on Submit Post-Trial</p>
+    <div class="recipient">vaishnavi.kulkarni@ericrobotics.com</div>
+    <p style="font-size:0.78rem;color:#6b7280;margin-top:8px;">Env: TRIAL_REPORT_EMAIL</p>
+  </div>
+  <div class="email-card">
+    <h4>Software Ticket</h4>
+    <p style="font-size:0.82rem;color:#6b7280;margin-bottom:8px;">issueType = "Software"</p>
+    <div class="recipient">kunal.awari@ericrobotics.com</div>
+    <div class="recipient">pratik.software@ericrobotics.com</div>
+    <p style="font-size:0.78rem;color:#6b7280;margin-top:8px;">Env: SOFTWARE_LEAD_EMAIL</p>
+  </div>
+  <div class="email-card">
+    <h4>Hardware Ticket</h4>
+    <p style="font-size:0.82rem;color:#6b7280;margin-bottom:8px;">issueType = "Hardware"</p>
+    <div class="recipient">sarthak.gupta@ericrobotics.com</div>
+    <div class="recipient">shreyas.shinde@ericrobotics.com</div>
+    <p style="font-size:0.78rem;color:#6b7280;margin-top:8px;">Env: HARDWARE_LEAD_EMAIL</p>
+  </div>
+</div>
+
+<h3>Cloudflare Email Delivery</h3>
+<div class="flow">
+  <div class="box">sendConfiguredEmail()</div>
+  <div class="arrow-down"></div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;">
+    <div class="flow">
+      <div style="font-size:0.75rem;color:#f97316;font-weight:700;margin-bottom:6px;">Email provider</div>
+      <div class="box orange">Cloudflare EMAIL binding</div>
+    </div>
+  </div>
+</div>
+
+<h2>5. Data Sync Architecture</h2>
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin:20px 0;">
+  <div class="section-card" style="flex:1;min-width:220px;">
+    <h3 style="margin-top:0;">Browser (localStorage)</h3>
+    <div class="flow">
+      <div class="box blue">saveTrial()</div>
+      <div class="arrow-down"></div>
+      <div class="box yellow">queueRemoteTrialSave() 500ms debounce</div>
+      <div class="arrow-down"></div>
+      <div class="box green">PUT /api/trials/:id</div>
+    </div>
+  </div>
+  <div class="section-card" style="flex:1;min-width:220px;">
+    <h3 style="margin-top:0;">Server Sync</h3>
+    <div class="flow">
+      <div class="box blue">syncTrialsWithServer()</div>
+      <div class="arrow-down"></div>
+      <div class="box">GET /api/trials</div>
+      <div class="arrow-down"></div>
+      <div class="box green">Merge local + remote</div>
+    </div>
+  </div>
+  <div class="section-card" style="flex:1;min-width:220px;">
+    <h3 style="margin-top:0;">Load Trial</h3>
+    <div class="flow">
+      <div class="box blue">loadSharedTrial(id)</div>
+      <div class="arrow-down"></div>
+      <div class="box">GET /api/trials/:id</div>
+      <div class="arrow-down"></div>
+      <div class="box green">Cache in localStorage</div>
+    </div>
+  </div>
+</div>
+
+<h2>6. Database Schema</h2>
+<div class="schema">
+  <div class="table-box">
+    <div class="table-box-header">employees</div>
+    <div class="table-box-row"><span>id</span><span class="col-pk">PK</span></div>
+    <div class="table-box-row"><span>employee_code</span><span class="col-type">TEXT UNIQUE</span></div>
+    <div class="table-box-row"><span>name</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>designation</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>aadhaar_ciphertext</span><span class="col-type">TEXT (AES)</span></div>
+    <div class="table-box-row"><span>is_active</span><span class="col-type">SMALLINT</span></div>
+    <div class="table-box-row"><span>created_at</span><span class="col-type">TIMESTAMPTZ</span></div>
+  </div>
+  <div class="table-box">
+    <div class="table-box-header">trials</div>
+    <div class="table-box-row"><span>trial_id</span><span class="col-pk">PK</span></div>
+    <div class="table-box-row"><span>title</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>state</span><span class="col-type">JSONB</span></div>
+    <div class="table-box-row"><span>version</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>custom_trial_id</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>submitted</span><span class="col-type">BOOLEAN</span></div>
+    <div class="table-box-row"><span>agenda_submitted</span><span class="col-type">BOOLEAN</span></div>
+    <div class="table-box-row"><span>pre_trial_submitted</span><span class="col-type">BOOLEAN</span></div>
+    <div class="table-box-row"><span>owner_code</span><span class="col-fk">FK employees</span></div>
+    <div class="table-box-row"><span>created_at</span><span class="col-type">TIMESTAMPTZ</span></div>
+    <div class="table-box-row"><span>updated_at</span><span class="col-type">TIMESTAMPTZ</span></div>
+  </div>
+  <div class="table-box">
+    <div class="table-box-header">support_tickets</div>
+    <div class="table-box-row"><span>id</span><span class="col-pk">PK</span></div>
+    <div class="table-box-row"><span>ticket_id</span><span class="col-type">TEXT UNIQUE</span></div>
+    <div class="table-box-row"><span>status</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>raised_by</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>employee_code</span><span class="col-fk">FK employees</span></div>
+    <div class="table-box-row"><span>issue_type</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>description</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>trial_id</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>created_at</span><span class="col-type">TIMESTAMPTZ</span></div>
+  </div>
+  <div class="table-box">
+    <div class="table-box-header">ticket_attachments</div>
+    <div class="table-box-row"><span>id</span><span class="col-pk">PK</span></div>
+    <div class="table-box-row"><span>ticket_id</span><span class="col-fk">FK tickets</span></div>
+    <div class="table-box-row"><span>filename</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>content_type</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>content_base64</span><span class="col-type">TEXT</span></div>
+    <div class="table-box-row"><span>size_bytes</span><span class="col-type">INTEGER</span></div>
+  </div>
+</div>
+
+<h2>7. Role-Based Access</h2>
+<div class="role-box">
+  <div class="role-card regular">
+    <h4 style="color:#1e40af;">Regular Employee</h4>
+    <ul>
+      <li>Fill checklist (Sections 2, 3, 4)</li>
+      <li>View agenda (read-only)</li>
+      <li>Submit Pre-Trial</li>
+      <li>Submit Post-Trial</li>
+      <li>Raise support tickets</li>
+      <li>View trial history</li>
+    </ul>
+  </div>
+  <div class="role-card pmo">
+    <h4 style="color:#7e22ce;">PMO (codes: 2440, 16080)</h4>
+    <ul>
+      <li>All regular employee permissions</li>
+      <li>Edit Trial Agenda (Section 1)</li>
+      <li>Submit Agenda to Trial List</li>
+      <li>Print Acknowledgment (full Aadhaar)</li>
+      <li>Access admin panel</li>
+    </ul>
+  </div>
+</div>
+
+<h2>8. API Routes Reference</h2>
+<table>
+  <tr><th>Method</th><th>Route</th><th>Auth</th><th>Description</th></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/session</td><td>—</td><td>Get current logged-in employee</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/verify-employee</td><td>—</td><td>Login with employee code</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/register</td><td>—</td><td>Self-register employee</td></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/trials</td><td>&#10003;</td><td>List all trials</td></tr>
+  <tr><td><span class="tag tag-yellow">PUT</span></td><td>/api/trials/:id</td><td>&#10003;</td><td>Save / update trial</td></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/trials/:id</td><td>&#10003;</td><td>Get single trial</td></tr>
+  <tr><td><span class="tag tag-red">DELETE</span></td><td>/api/trials/:id</td><td>&#10003;</td><td>Delete trial</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/trials/serial</td><td>&#10003;</td><td>Allocate next trial serial number</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/submit-trial</td><td>&#10003;</td><td>Submit trial + send email summary</td></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/tickets</td><td>&#10003;</td><td>List support tickets</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/tickets</td><td>&#10003;</td><td>Raise new support ticket</td></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/tickets/:id</td><td>&#10003;</td><td>Get single ticket</td></tr>
+  <tr><td><span class="tag tag-blue">GET</span></td><td>/api/agenda-employees</td><td>&#10003;</td><td>List employees for roster</td></tr>
+  <tr><td><span class="tag tag-green">POST</span></td><td>/api/agenda-employees/print</td><td>PMO</td><td>Get full Aadhaar for printing</td></tr>
+</table>
+
+<h2>9. Reusable Components</h2>
+<table>
+  <tr><th>Component</th><th>File</th><th>Description</th></tr>
+  <tr><td>AuthProvider</td><td>app/components/AuthProvider.jsx</td><td>Global auth context — useAuth() hook</td></tr>
+  <tr><td>ChecklistApp</td><td>app/components/ChecklistApp.jsx</td><td>Main checklist UI with all sections</td></tr>
+  <tr><td>QuestionCard</td><td>inside ChecklistApp</td><td>Renders any question type dynamically</td></tr>
+  <tr><td>TimeField</td><td>inside ChecklistApp</td><td>Time input with Now button</td></tr>
+  <tr><td>TrialAgendaTables</td><td>inside ChecklistApp</td><td>Internal + External agenda editor</td></tr>
+  <tr><td>EmployeeRoster</td><td>inside ChecklistApp</td><td>Team member selector with Aadhaar</td></tr>
+  <tr><td>EmployeeSearch</td><td>inside ChecklistApp</td><td>Type-ahead employee search</td></tr>
+  <tr><td>Section</td><td>inside ChecklistApp</td><td>Full section with submit buttons</td></tr>
+  <tr><td>SkeletonView</td><td>inside ChecklistApp</td><td>Loading skeleton UI</td></tr>
+  <tr><td>HistoryClient</td><td>app/history/HistoryClient.jsx</td><td>Trial list / history page</td></tr>
+  <tr><td>TicketsClient</td><td>app/tickets/TicketsClient.jsx</td><td>Support tickets list page</td></tr>
+  <tr><td>LoginClient</td><td>app/login/LoginClient.jsx</td><td>Login form</td></tr>
+</table>
+
+<h2>10. Question Types</h2>
+<table>
+  <tr><th>Type</th><th>UI Element</th><th>Used For</th></tr>
+  <tr><td>text</td><td>Single line input</td><td>PTW number, approver name</td></tr>
+  <tr><td>textarea</td><td>Multi-line input</td><td>Observations, remarks</td></tr>
+  <tr><td>time</td><td>Time input + Now button</td><td>Reaching time, assembly time</td></tr>
+  <tr><td>timeRange</td><td>Start + End time</td><td>Time ranges</td></tr>
+  <tr><td>date</td><td>Date picker</td><td>Block date</td></tr>
+  <tr><td>number</td><td>Numeric input</td><td>Distance (m)</td></tr>
+  <tr><td>select</td><td>Dropdown</td><td>Trial type</td></tr>
+  <tr><td>yesNoOther</td><td>Yes / No / Other radio</td><td>Assembly checks</td></tr>
+  <tr><td>yesOther</td><td>Yes / Other radio</td><td>Binary checks</td></tr>
+  <tr><td>checklist</td><td>Multi-checkbox group</td><td>PPE, supplies</td></tr>
+  <tr><td>socPair</td><td>Battery 1 + Battery 2 %</td><td>State of charge</td></tr>
+  <tr><td>locationPair</td><td>From + To inputs</td><td>Block location</td></tr>
+  <tr><td>agendaTable</td><td>Full table editor</td><td>Trial agenda</td></tr>
+  <tr><td>employeeRoster</td><td>Team member selector</td><td>Team members</td></tr>
+</table>
+
+<h2>11. Environment Variables</h2>
+<table>
+  <tr><th>Variable</th><th>Used For</th><th>Required</th></tr>
+  <tr><td>DATABASE_URL</td><td>Neon PostgreSQL connection</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>AUTH_SECRET</td><td>HMAC session signing</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>AADHAAR_ENCRYPTION_KEY</td><td>AES-256 Aadhaar encryption</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>TRIAL_REPORT_EMAIL</td><td>Trial summary recipients</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>SOFTWARE_LEAD_EMAIL</td><td>Software ticket recipients</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>HARDWARE_LEAD_EMAIL</td><td>Hardware ticket recipients</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>TEAM_LEAD_EMAILS</td><td>Fallback ticket recipients</td><td><span class="tag tag-green">Always</span></td></tr>
+  <tr><td>EMAIL</td><td>Cloudflare Email Service send_email binding</td><td><span class="tag tag-green">Cloudflare</span></td></tr>
+  <tr><td>MAIL_FROM</td><td>Onboarded Cloudflare sender address</td><td><span class="tag tag-green">Cloudflare</span></td></tr>
+</table>
+
+<h2>12. Deployment Architecture</h2>
+<div class="system-diagram">
+  <div class="layer" style="background:#1a1a2e;border:2px solid #f97316;">
+    <div class="layer-title" style="color:#f97316;">Cloudflare Workers</div>
+    <div class="layer-items">
+      <div class="layer-item" style="background:#2d2d44;color:#fff;border-color:#444;">worker.js (Next.js handler)</div>
+      <div class="layer-item" style="background:#2d2d44;color:#fff;border-color:#444;">assets/ (CDN)</div>
+      <div class="layer-item" style="background:#2d2d44;color:#fff;border-color:#444;">middleware/ (Edge)</div>
+      <div class="layer-item" style="background:#2d2d44;color:#fff;border-color:#444;">EMAIL binding</div>
+      <div class="layer-item" style="background:#2d2d44;color:#fff;border-color:#444;">Secrets (encrypted)</div>
+    </div>
+  </div>
+  <div class="layer-arrow">&#8595;</div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;">
+    <div class="layer layer-data" style="flex:1;min-width:200px;">
+      <div class="layer-title" style="color:#7e22ce;">Neon PostgreSQL</div>
+      <div class="layer-items">
+        <div class="layer-item">employees</div>
+        <div class="layer-item">trials</div>
+        <div class="layer-item">tickets</div>
+      </div>
+    </div>
+    <div class="layer layer-server" style="flex:1;min-width:200px;">
+      <div class="layer-title" style="color:#166534;">Cloudflare Email</div>
+      <div class="layer-items">
+        <div class="layer-item">TRIAL_REPORT_EMAIL</div>
+        <div class="layer-item">SOFTWARE_LEAD_EMAIL</div>
+        <div class="layer-item">HARDWARE_LEAD_EMAIL</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+<footer>
+  ERIC Robotics Private Limited &nbsp;|&nbsp; RailwayMitra Architecture Document &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; 2026
+</footer>
+</body>
+</html>

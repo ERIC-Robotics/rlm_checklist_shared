@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>RLM Checklist Project Guide</title>
+<style>
+body { font-family: Arial, sans-serif; color: #202124; line-height: 1.45; margin: 42px; }
+h1 { color: #17365d; font-size: 28px; border-bottom: 2px solid #17365d; padding-bottom: 8px; }
+h2 { color: #1f4e79; margin-top: 28px; border-bottom: 1px solid #b7c9d6; padding-bottom: 4px; }
+h3 { color: #2f5597; margin-top: 20px; }
+p, li { font-size: 10.5pt; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0 18px; font-size: 10pt; }
+th { background: #d9eaf7; text-align: left; }
+th, td { border: 1px solid #9eabb5; padding: 7px; vertical-align: top; }
+code, pre { font-family: Consolas, monospace; }
+pre { background: #f2f4f6; border: 1px solid #d0d7de; padding: 10px; white-space: pre-wrap; }
+.note { background: #fff2cc; border-left: 4px solid #bf9000; padding: 9px 12px; }
+.ok { background: #e2f0d9; border-left: 4px solid #70ad47; padding: 9px 12px; }
+.small { color: #666; font-size: 9pt; }
+</style>
+</head>
+<body>
+<h1>RLM Checklist Project – Operations and Database Guide</h1>
+<p><strong>Purpose:</strong> This document explains what the project is, how it is deployed, where data is stored, how a trial is saved, and how to verify or troubleshoot saved data.</p>
+<p><strong>Last updated:</strong> 31 October 2026</p>
+
+<h2>1. Project overview</h2>
+<p>The RLM Checklist project is a Next.js web application used to sign in employees, create and edit railway/trial checklist forms, save trial information, submit agenda and pre-trial data, and manage support tickets.</p>
+<table>
+<tr><th>Item</th><th>Details</th></tr>
+<tr><td>Application</td><td>RLM Checklist / Trial Checklist Dashboard</td></tr>
+<tr><td>Framework</td><td>Next.js 16 with React 19</td></tr>
+<tr><td>Runtime hosting</td><td>Cloudflare Workers using the OpenNext adapter</td></tr>
+<tr><td>Primary database</td><td>Neon PostgreSQL</td></tr>
+<tr><td>Authentication</td><td>Employee code login with a signed session cookie</td></tr>
+<tr><td>Local browser storage</td><td>Used as a temporary/local cache and offline fallback</td></tr>
+<tr><td>Important source folder</td><td><code>rlm_checklist_shared-feat-simple_login</code></td></tr>
+</table>
+
+<h2>2. Important database clarification</h2>
+<div class="note"><strong>This application does not use Cloudflare D1 for trials.</strong> Cloudflare hosts the Worker, but employee records, trials, and support tickets are stored in Neon PostgreSQL through the <code>DATABASE_URL</code> environment variable.</div>
+<p>Therefore, the Cloudflare D1 dashboard may show zero writes even when the application is saving correctly. To inspect trial data, use the Neon console and the <code>trials</code> table.</p>
+
+<h2>3. Application architecture</h2>
+<table>
+<tr><th>Layer</th><th>Location</th><th>Responsibility</th></tr>
+<tr><td>User interface</td><td><code>app/components/ChecklistApp.jsx</code></td><td>Checklist form, autosave, trial list, submission actions, and user messages.</td></tr>
+<tr><td>Browser storage</td><td><code>lib/checklistStorage.js</code></td><td>Stores a local copy and queues the shared server save.</td></tr>
+<tr><td>Database client</td><td><code>lib/db.js</code></td><td>Creates the Neon PostgreSQL connection and initializes tables.</td></tr>
+<tr><td>Trial list API</td><td><code>app/api/trials/route.js</code></td><td>Reads visible trials from PostgreSQL.</td></tr>
+<tr><td>Single trial API</td><td><code>app/api/trials/[trialId]/route.js</code></td><td>Loads, saves, and deletes an individual trial.</td></tr>
+<tr><td>Worker configuration</td><td><code>wrangler.jsonc</code></td><td>Cloudflare Worker, assets, email binding, and observability configuration.</td></tr>
+</table>
+
+<h2>4. Database tables</h2>
+<p>In Neon, open the production branch, then go to <strong>Postgres database → Tables → neondb → public</strong>.</p>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<tr><td><code>employees</code></td><td>Active and pending employee accounts.</td></tr>
+<tr><td><code>employee_registration_approvals</code></td><td>Temporary approval tokens for new employee registration.</td></tr>
+<tr><td><code>trials</code></td><td>Shared trial forms and checklist answers. The complete form is in the <code>state</code> JSONB column.</td></tr>
+<tr><td><code>deleted_trials</code></td><td>Trial IDs that were deleted and must not be recreated by an old browser cache.</td></tr>
+<tr><td><code>support_tickets</code></td><td>Shared support ticket records.</td></tr>
+<tr><td><code>support_ticket_attachments</code></td><td>Attachments associated with support tickets.</td></tr>
+</table>
+
+<h2>5. How a trial is saved</h2>
+<ol>
+<li>An employee signs in with an active employee code.</li>
+<li>The user creates a trial or opens an existing trial.</li>
+<li>When a form value changes, the browser immediately saves a local copy.</li>
+<li>After approximately 500 milliseconds, the browser sends a <code>PUT</code> request to <code>/api/trials/[trialId]</code>.</li>
+<li>The API validates the session and writes the trial to Neon using an <code>INSERT ... ON CONFLICT DO UPDATE</code> query.</li>
+<li>The record is stored in the <code>trials</code> table. Form answers are stored in <code>state</code> as JSON.</li>
+</ol>
+<div class="ok"><strong>Successful save check:</strong> The <code>updated_at</code> value in Neon changes to the latest save time. The date displayed in the trial title is form data and is not the database save timestamp.</div>
+
+<h2>6. How to verify a deployed save</h2>
+<ol>
+<li>Open the deployed Cloudflare Worker URL.</li>
+<li>Sign in with an active employee code.</li>
+<li>Create a trial or change a field in an existing trial.</li>
+<li>Wait one or two seconds for autosave.</li>
+<li>Open Neon and select the correct production branch.</li>
+<li>Go to <strong>Postgres database → Tables → neondb → public → trials</strong>.</li>
+<li>Refresh the table, or run the SQL query below.</li>
+</ol>
+<pre>SELECT trial_id, title, owner_code, created_at, updated_at
+FROM trials
+ORDER BY updated_at DESC
+LIMIT 20;</pre>
+<p>The newest row should have a current <code>updated_at</code> timestamp and the employee's <code>owner_code</code>. Neon timestamps are normally displayed in UTC; convert to local time when comparing with the computer clock.</p>
+
+<h2>7. Who can see a trial?</h2>
+<p>The trial list is intentionally filtered for security. A user can normally see a trial when its <code>owner_code</code> matches their employee code. Submitted, agenda-submitted, and pre-trial-submitted records are also visible according to the application rules. PMO users have additional access.</p>
+<p>If a trial exists in Neon but is not visible in the deployed application, first compare the trial's <code>owner_code</code> with the employee code used to log in.</p>
+
+<h2>8. Required deployment configuration</h2>
+<p>Cloudflare Worker secrets are separate from local <code>.env.local</code>. The following values must be configured in the deployed Worker:</p>
+<table>
+<tr><th>Variable</th><th>Purpose</th></tr>
+<tr><td><code>DATABASE_URL</code></td><td>Neon pooled PostgreSQL connection string. It must point to the intended production project/branch.</td></tr>
+<tr><td><code>AUTH_SECRET</code></td><td>At least 32 characters; signs employee session cookies.</td></tr>
+<tr><td><code>AADHAAR_ENCRYPTION_KEY</code></td><td>Stable encryption key for external member Aadhaar values.</td></tr>
+<tr><td><code>APP_BASE_URL</code></td><td>Public application URL used in approval links.</td></tr>
+<tr><td>Email variables</td><td>Cloudflare Email binding and/or SMTP settings for notifications.</td></tr>
+</table>
+<p>After changing Worker secrets or source code, redeploy the application. Local changes and local <code>.env.local</code> values do not automatically update the live Worker.</p>
+
+<h2>9. Deployment commands</h2>
+<p>Run these commands from the application folder containing <code>package.json</code>:</p>
+<pre>npm ci
+npm run build
+npm run preview:cloudflare
+npm run deploy:cloudflare</pre>
+<p>The production deployment command builds the OpenNext Worker and deploys it to Cloudflare.</p>
+
+<h2>10. Troubleshooting</h2>
+<table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Action</th></tr>
+<tr><td>D1 shows “Rows written: 0”</td><td>D1 is not used by this application.</td><td>Check Neon PostgreSQL instead.</td></tr>
+<tr><td>Form looks saved on the same browser but no Neon row exists</td><td>Only the local browser cache saved, or the API save failed.</td><td>Look for “Shared save failed” in the application and inspect Worker logs.</td></tr>
+<tr><td>Trial exists in Neon but is not listed</td><td>Logged-in employee does not have access to that <code>owner_code</code>, or the Worker points to another database.</td><td>Compare employee code and confirm <code>DATABASE_URL</code>.</td></tr>
+<tr><td>Login fails</td><td>Missing database connection, employee is inactive, or <code>AUTH_SECRET</code> is missing.</td><td>Check Worker secrets and the <code>employees</code> table.</td></tr>
+<tr><td>Old data appears after deployment</td><td>Worker secret points to a different Neon branch/project.</td><td>Compare the deployed <code>DATABASE_URL</code> with the production Neon connection string.</td></tr>
+</table>
+
+<h2>11. Useful files</h2>
+<ul>
+<li><code>README.md</code> – setup and deployment instructions.</li>
+<li><code>docs/ARCHITECTURE.md</code> – application architecture.</li>
+<li><code>lib/db.js</code> – Neon connection and schema initialization.</li>
+<li><code>lib/checklistStorage.js</code> – browser cache and remote autosave.</li>
+<li><code>app/api/trials/route.js</code> – trial list API and visibility filtering.</li>
+<li><code>app/api/trials/[trialId]/route.js</code> – individual trial save/load API.</li>
+<li><code>wrangler.jsonc</code> – Cloudflare Worker configuration.</li>
+</ul>
+
+<h2>12. Security notes</h2>
+<ul>
+<li>Never put production secrets in <code>wrangler.jsonc</code>, source files, screenshots, or Git.</li>
+<li>Keep <code>DATABASE_URL</code>, <code>AUTH_SECRET</code>, and <code>AADHAAR_ENCRYPTION_KEY</code> private.</li>
+<li>Use the production Neon branch for the live Worker and verify the connection before deployment.</li>
+<li>Do not treat the browser local cache as the shared source of truth.</li>
+</ul>
+</body>
+</html>
